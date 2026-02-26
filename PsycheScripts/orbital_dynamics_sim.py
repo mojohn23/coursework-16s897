@@ -18,7 +18,7 @@ state0 = np.array([
     0, 0, v_circ    # vx, vy, vz
 ])
 
-def two_body(t, state):
+def two_body(state):
     x, y, z, vx, vy, vz = state
     r = np.sqrt(x**2 + y**2 + z**2)
     
@@ -73,6 +73,7 @@ axis_length = 1.2 * r0
 ax.quiver(0,0,0, axis_length,0,0)
 ax.quiver(0,0,0, 0,axis_length,0)
 ax.quiver(0,0,0, 0,0,axis_length)
+ax.set_box_aspect([1, 1, 1]) 
 
 ax.text(axis_length,0,0,'X', fontsize=12)
 ax.text(0,axis_length,0,'Y', fontsize=12)

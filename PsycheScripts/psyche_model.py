@@ -117,6 +117,7 @@ def parallel_axis(MOI, mass: float, distance):
 
 # I am hiding long sections of code in these if statements because it lets me collapse the lines lmao
 if __name__ == '__main__':
+    print('testing 123')
     # Initialize each piece with volume, mass, body MOI, (approximated) XYZ surface areas, (approximated) surface normal vectors
     if True:
         bus_height = 2.9 # [m] Z
@@ -427,3 +428,43 @@ if __name__ == '__main__':
         panelupR.nvecx1 = None # Blocked
 
         paneldownR.nvecx2 = None # Blocked
+
+
+############################### Problem 5 ###################################
+
+def rk4(f, state0, t0, tf, dt):
+    t_values = np.arange(t0, tf, dt)
+    state_values = np.zeros((len(t_values), len(state0)))
+    state = state0.copy()
+    
+    for i, t in enumerate(t_values):
+        state_values[i] = state
+        
+        k1 = f(t, state)
+        k2 = f(t + dt/2, state + dt*k1/2)
+        k3 = f(t + dt/2, state + dt*k2/2)
+        k4 = f(t + dt, state + dt*k3)
+        
+        state = state + (dt/6)*(k1 + 2*k2 + 2*k3 + k4)
+        
+    return t_values, state_values
+
+def eulers_equation(state):
+    q = state[0:4] # quaternion
+    w = state[4:7] # angular velocity
+    q_dot = [] # need to fill in
+    w_dot = [] # need to fill in 
+    
+    return np.concatenate((q_dot, w_dot))
+
+state0 = np.array([
+    1, 0, 0, 0,   # q
+    0, 0, 10    # inital angular velocity, need to update
+])
+
+t0 = 0
+tf = 100
+dt = 1  
+
+t, state = rk4(eulers_equation, state0, t0, tf, dt)
+                          
