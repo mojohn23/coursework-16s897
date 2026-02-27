@@ -18,7 +18,7 @@ state0 = np.array([
     0, 0, v_circ    # vx, vy, vz
 ])
 
-def two_body(state):
+def two_body(t, state):
     x, y, z, vx, vy, vz = state
     r = np.sqrt(x**2 + y**2 + z**2)
     
