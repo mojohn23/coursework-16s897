@@ -5,8 +5,10 @@ import psyche_model as psy
 import adcs_toolbox as adcs
 
 J = psy.tot_moicom
+B_to_P = np.array([[0, 1, 0], [-1, 0, 0], [0, 0, 1]])
+J = B_to_P @ J @ B_to_P.T # Express J in principle frame
 
-def euler_simp(t, state, J = psy.tot_moicom):
+def euler_simp(t, state, J = J):
     # t is not actually used here
     # State vector must be 1x7 horizontal vec
     q = state[:4]
@@ -35,9 +37,9 @@ def rk4(f, state0, t0, tf, dt):
 
 def plot_omega(t_val, state_val, title):
     fig, ax = plt.subplots()
-    ax.plot(t_val, state_val[:, 4], color = 'blue', label = '$\omega_x$')
-    ax.plot(t_val, state_val[:, 5], color = 'red', label = '$\omega_y$')
-    ax.plot(t_val, state_val[:, 6], color = 'green', label = '$\omega_z$')
+    ax.plot(t_val, state_val[:, 4], color = 'blue', label = '$^P\omega_x$')
+    ax.plot(t_val, state_val[:, 5], color = 'red', label = '$^P\omega_y$')
+    ax.plot(t_val, state_val[:, 6], color = 'green', label = '$^P\omega_z$')
     plt.legend()
     plt.xlabel('Time (s)')
     plt.ylabel('Angular velocity (rad/s)')
@@ -50,35 +52,35 @@ tf = 60 # [sec]
 dt = 0.1 # [sec]
 
 # Set perturbation here
-perturbation = np.array([0, 0, 0])
-# perturbation = 0.1*np.random.randint(1, 5, size = (1, 3))
+# perturbation = np.array([0, 0, 0])
+perturbation = 0.01*np.random.randint(1, 5, size = (1, 3))
 
 # First case: only w about minor axis
-w = np.array([10*2*m.pi/60, 0, 0]) # [rad/s], equivalent to 10 RPM
+w = np.array([10*2*m.pi/60, 0, 0]) # [rad/s], equivalent to 10 RPM, in principle frame
 w = w + perturbation[0]
 state0 = np.hstack([q0, w])
 t_val, state_val = rk4(euler_simp, state0, t0, tf, dt)
-if perturbation.all == 0:
+if float(perturbation.sum()) == 0:
     plot_omega(t_val, state_val, 'Case 1: Pure Rotation about Minor Axis')
 else:
     plot_omega(t_val, state_val, 'Case 1: Rotation with Perturbation about Minor Axis')
 
 # Second case: only w about intermediate axis
-w = np.array([0, 10*2*m.pi/60, 0]) # [rad/s], equivalent to 10 RPM
+w = np.array([0, 10*2*m.pi/60, 0]) # [rad/s], equivalent to 10 RPM, in principle frame
 w = w + perturbation[0]
 state0 = np.hstack([q0, w])
 t_val, state_val = rk4(euler_simp, state0, t0, tf, dt)
-if perturbation.all == 0:
+if float(perturbation.sum()) == 0:
     plot_omega(t_val, state_val, 'Case 2: Pure Rotation about Intermediate Axis')
 else:
     plot_omega(t_val, state_val, 'Case 2: Rotation with Perturbation about Intermediate Axis')
 
 # Third case: only w about major axis
-w = np.array([0, 0, 10*2*m.pi/60]) # [rad/s], equivalent to 10 RPM
+w = np.array([0, 0, 10*2*m.pi/60]) # [rad/s], equivalent to 10 RPM, in principle frame
 w = w + perturbation[0]
 state0 = np.hstack([q0, w])
 t_val, state_val = rk4(euler_simp, state0, t0, tf, dt)
-if perturbation.all == 0:
+if float(perturbation.sum()) == 0:
     plot_omega(t_val, state_val, 'Case 3: Pure Rotation about Major Axis')
 else:
     plot_omega(t_val, state_val, 'Case 3: Rotation with Perturbation about Major Axis')
