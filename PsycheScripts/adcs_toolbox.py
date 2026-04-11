@@ -4,7 +4,7 @@ import numpy as np
 # A general repository of functions useful for ADCS in the Hamiltonian convention [s, v]
 
 H = np.vstack([np.zeros((1, 3)), np.eye(3)])
-T = np.block([[np.array([[1]]), np.zeros((1, 3))], [np.zeros((3, 1)), -np.eye(3)]])
+Tmat = np.block([[np.array([[1]]), np.zeros((1, 3))], [np.zeros((3, 1)), -np.eye(3)]])
 
 def rot_simple(angle: float, axis: str, unit:str = 'deg'):
     # Input by default assumes degrees, specify otherwise
@@ -41,7 +41,7 @@ def quat(r, theta: float):
 
 def qinv(q):
     # q is a 1x4 horizontal quaternion with [s, v]
-    return T @ q
+    return Tmat @ q
 
 def qconj(q):
     # q is a 1x4 horizontal quaternion with [s, v]
@@ -58,6 +58,14 @@ def qexp(phi):
     v = phi*np.sinc(theta/math.pi) # sinc is in the np library
     # Return a 1x4 quaternion
     return np.hstack([[s], v])
+
+def qlog(q):
+    # q is a 1x4 horizontal quaternion [s, v]
+    s = q[0]
+    v = q[1:4]
+    theta = np.arccos(np.clip(s, -1, 1))
+    phi = theta*unit_vec(v)
+    return phi
 
 def hat(x):
     # x is a 1x3 horizontal vector, as standard np.array
