@@ -24,7 +24,7 @@ def random_sensor(n_SRU, n_CSS):
 
     # Generate random SRU measurements: multiplicative error
     for i in range(n_SRU):
-        r_B[:, i] = adcs.unit_vec(np.random.randn(3)) # Generate random inertial unit vector in the body frame
+        r_B[:, i] = adcs.unit_vec(np.random.randn(3)) # Generate random unit vector in the body frame
         r_N_real[:, i] = adcs.unit_vec(Q_real.T@r_B[:, i]) # Transform real vector to inertial frame, real inertial frame
         noise_vec = np.random.multivariate_normal(np.zeros(3), S_SRU) # Sample noise vector as 3-param
         delta_q = adcs.qexp(noise_vec) # Turn into noise quaternion
@@ -33,7 +33,7 @@ def random_sensor(n_SRU, n_CSS):
 
 # Generate random CSS measurements: additive error
     for i in range (n_CSS):
-        r_B[:, n_SRU + i] = adcs.unit_vec(np.random.randn(3)) # Generate random inertial unit vector in the body frame
+        r_B[:, n_SRU + i] = adcs.unit_vec(np.random.randn(3)) # Generate random unit vector in the body frame
         r_N_real[:, n_SRU + i] = adcs.unit_vec(Q_real.T@r_B[:, n_SRU + i]) # Transform real vector to inertial frame, real inertial frame
         r_B[:, n_SRU + i] = adcs.unit_vec(r_B[:, n_SRU + i] + np.random.multivariate_normal(np.zeros(3), S_CSS)) # r_B = r_B_real + noise, overwrite r_B and normalize
 
@@ -70,7 +70,7 @@ def wahba_davenport(r_B, r_N_real):
     return Q_dav, q_dav
 
 # Gauss-Newton Method
-def wahba_gn():
+def wahba_gn(r_B, r_N_real):
     tol = 1e-6
     count = 0
     q_gn = adcs.qexp(np.random.randn(3)) # Initialize first guess
@@ -160,7 +160,7 @@ if True:
         t_dav[i] = time.perf_counter() - start_dav
 
         start_gn = time.perf_counter()
-        Q_gn, q_gn = wahba_gn()
+        Q_gn, q_gn = wahba_gn(r_B, r_N_real)
         t_gn[i] = time.perf_counter() - start_gn
 
         error_svd[i] = Qdiff(Q_svd, Q_real)

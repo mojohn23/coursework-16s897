@@ -6,38 +6,19 @@ import attitude_estimation as att_est
 import matplotlib.pyplot as plt
 import scipy
 
-### CHAT I DON'T THINK WE EVEN NEED POSITION AND VELOCITY LOWKEY
-# Psyche and orbit parameters for orbital dynamics model
-G = 6.67430e-11
-M = 2.287e19
-mu = G * M
-R_psyche = 111e3        # meters
-altitude = 303e3        # meters
-r0 = R_psyche + altitude
-v_circ = np.sqrt(mu / r0)   # m/s
-sun_vec = adcs.unit_vec(np.random.randn(3)) # Sun-pointing in inertial frame
-
-### Initial conditions ###
-# Assume 0.1 deg/s body rate, uncontrolled tumble (no gyro?)
+### Initial state conditions ###
+# Assume slow, uncontrolled tumble (no gyro?)
 q0 = adcs.unit_vec(np.random.randn(4)) # Random orientation, unit quaternion
-omega0 = np.random.random(3) # [rad/s]
-# r0 = np.array([r0, 0, 0]) # Starting at periapsis
-# v0 = np.array([0, 0, v_circ]) # Assuming circular orbit
+omega0 = 0.01*np.random.random(3) # Random slow tumble rate, [rad/s]
 state0 = np.concatenate([q0, omega0])
 
-def orbit_dynamics(t, state):
+def spacecraft_dynamics(t, state):
     q = state[0:4]
     omega = state[4:7]
-    # r = state[7:10]
-    # v = state[10:13]
 
     # Rotational motion (zero-torque)
     q_dot = 0.5 * adcs.G(q) @ omega
     omega_dot = -np.linalg.solve(J, np.cross(omega, J@omega))
-
-    # Orbital motion
-    # r_norm = np.linalg.norm(r)
-    # a = -mu * r / r_norm**3
 
     return np.concatenate([q_dot, omega_dot])
 
@@ -63,10 +44,10 @@ def Qdiff(Q_computed, Q_real):
     return (180/math.pi)*np.linalg.norm(adcs.unhat(scipy.linalg.logm(Q_computed.T@Q_real)))
 
 dt = 0.1 # Time step [s]
-n = 600 # Number of time steps
+n = 6000 # Number of time steps
 tf = n*dt
 
-t, state = rk4(orbit_dynamics, state0, 0, tf, dt) # The state comes out horizontally as (n) x (q omega r v)
+t, state = rk4(spacecraft_dynamics, state0, 0, tf, dt) # The state comes out horizontally as (n) x (q omega r v)
 state = state.T # Rotate it back to be (q omega r v) x (n)
 
 ##### NOISE MODELS #######################################
@@ -86,6 +67,7 @@ for k in range(n):
     qk = state[:4, k]
     for j in range(n_SRU):
         noise_vec = np.random.multivariate_normal(np.zeros(3), S_SRU) # This is a 3-parameter rotation
+        # noise_vec = np.zeros(3) # Set to zero for testing purposes
         delta_q = adcs.qexp(noise_vec) # Turn the noise vector to a noise delta quaternion
         q_noisy = adcs.qmult(qk, delta_q) # Quaternion multiply on the error
         ytraj[j*4:(j + 1)*4, k] = q_noisy # Output in ytraj
@@ -94,6 +76,7 @@ for k in range(n):
         r_B[:3, j, k] = adcs.unit_vec(adcs.Q(q_noisy).T@r_N_real[:3, j, k]) # Noisy vector in body frame
 
 # Noisy sun sensors
+sun_vec = adcs.unit_vec(np.random.randn(3)) # Random true sun vector in inertial frame
 S_CSS = att_est.S[3] # From attitude_estimation.py
 M_CSS = np.diag(1 + 0.06*np.random.randn(3))
 b_CSS = 0.015*np.random.randn(3)
@@ -216,7 +199,7 @@ if True:
         plt.ylabel('rad/s')
 
 # Compare filter to static estimate
-if False:
+if True:
     error_kalman = np.zeros(n)
     error_svd = np.zeros(n)
     error_dav = np.zeros(n)
@@ -261,25 +244,28 @@ if True:
         phi_error[:, i] = adcs.qlog(q_error) # Get the error as a 3-parameter vector
     
     plt.figure()
-    plt.plot(t[1:], sigma[0, 1:], linestyle = '--', color = 'blue', label = '1-sigma')
-    plt.plot(t[1:], -sigma[0, 1:], linestyle = '--', color = 'blue')
-    plt.plot(t[1:], phi_error[0, 1:], color = 'blue', label = 'Error')
+    plt.plot(t[2:], phi_error[0, 2:], color = 'blue', label = 'Error')
+    plt.plot(t[2:], sigma[0, 2:], linestyle = '--', color = 'darkolivegreen', label = '1-sigma')
+    plt.plot(t[2:], -sigma[0, 2:], linestyle = '--', color = 'darkolivegreen')
+    plt.legend()
     plt.xlabel('Time (s)')
     plt.ylabel('Error (rad)')
     plt.title('phi_x')
 
     plt.figure()
-    plt.plot(t[1:], sigma[1, 1:], linestyle = '--', color = 'blue', label = '1-sigma')
-    plt.plot(t[1:], -sigma[1, 1:], linestyle = '--', color = 'blue')
-    plt.plot(t[1:], phi_error[1, 1:], color = 'blue', label = 'Error')
+    plt.plot(t[2:], phi_error[1, 2:], color = 'blue', label = 'Error')
+    plt.plot(t[2:], sigma[1, 2:], linestyle = '--', color = 'darkolivegreen', label = '1-sigma')
+    plt.plot(t[2:], -sigma[1, 2:], linestyle = '--', color = 'darkolivegreen')
+    plt.legend()
     plt.xlabel('Time (s)')
     plt.ylabel('Error (rad)')
     plt.title('phi_y')
 
     plt.figure()
-    plt.plot(t[1:], sigma[2, 1:], linestyle = '--', color = 'blue', label = '1-sigma')
-    plt.plot(t[1:], -sigma[2, 1:], linestyle = '--', color = 'blue')
-    plt.plot(t[1:], phi_error[2, 1:], color = 'blue', label = 'Error')
+    plt.plot(t[2:], phi_error[2, 2:], color = 'blue', label = 'Error')
+    plt.plot(t[2:], sigma[2, 2:], linestyle = '--', color = 'darkolivegreen', label = '1-sigma')
+    plt.plot(t[2:], -sigma[2, 2:], linestyle = '--', color = 'darkolivegreen')
+    plt.legend()
     plt.xlabel('Time (s)')
     plt.ylabel('Error (rad)')
     plt.title('phi_z')
