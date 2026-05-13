@@ -25,7 +25,7 @@ class BoxObj:
         self.nvecy1 = np.transpose(np.array([0, 1, 0], ndmin = 2)) # normal vector on + Y face
         self.nvecy2 = np.transpose(np.array([0, -1, 0], ndmin = 2)) # normal vector on - Y face
         self.nvecz1 = np.transpose(np.array([0, 0, 1], ndmin = 2)) # normal vector on + Z face
-        self.nvecz2 = np.transpose(np.array([0, 0, -1], ndmin = 2)) # normal vector on + Z face
+        self.nvecz2 = np.transpose(np.array([0, 0, -1], ndmin = 2)) # normal vector on - Z face
 
 class FrustumObj:
     def __init__(self, r1: float, r2: float, height: float):
@@ -199,16 +199,16 @@ if True:
     ##### SUPPORTS -Y #################################################################################
     # Rod1 rotated -45 and placed along body -Y face
     Z = rot_simple(-45, 'z')
-    rod1R.com = Z@rod1R.com + np.transpose(np.array([0, -bus_width/2, 0], ndmin = 2))
+    rod1R.com = Z@-rod1R.com + np.transpose(np.array([0, -bus_width/2, 0], ndmin = 2))
     # Rod2 rotated 45 and placed along body -Y face
     Z = rot_simple(45, 'z')
-    rod2R.com = Z@rod2R.com + np.transpose(np.array([0, -bus_width/2, 0], ndmin = 2))
+    rod2R.com = Z@-rod2R.com + np.transpose(np.array([0, -bus_width/2, 0], ndmin = 2))
     # Rod3 rotated 90 and placed at the tip of rod1 and rod2
     rod3R.com = np.transpose(np.array([0, -bus_width/2 - 1.2, 0], ndmin = 2))
     # Rod4 placed at the tip of rod1
-    rod4R.com = rod4R.com + np.transpose(np.array([-bus_depth/2, -bus_width/2 - 1.2, 0], ndmin = 2))
+    rod4R.com = -rod4R.com + np.transpose(np.array([-bus_depth/2, -bus_width/2 - 1.2, 0], ndmin = 2))
     # Rod5 placed at the tip of rod3
-    rod5R.com = rod5R.com + np.transpose(np.array([bus_depth/2, -bus_width/2 - 1.2, 0], ndmin = 2))
+    rod5R.com = -rod5R.com + np.transpose(np.array([bus_depth/2, -bus_width/2 - 1.2, 0], ndmin = 2))
 
     ##### SOLAR PANELS -Y #############################################################################
     panelmidR.com = np.transpose(np.array([0, -(bus_width/2 + 1.74 + 3.18 + 3.18/2), 0], ndmin = 2))
@@ -229,49 +229,48 @@ if True:
     tot_left_com = rod1L.mass*rod1L.com + rod2L.mass*rod2L.com + rod3L.mass*rod3L.com + rod4L.mass*rod4L.com + rod5L.mass*rod5L.com + panelmidL.mass*panelmidL.com + panelouterL.mass*panelouterL.com + panelinnerL.mass*panelinnerL.com + panelupL.mass*panelupL.com + paneldownL.mass*paneldownL.com
     tot_right_com = rod1R.mass*rod1R.com + rod2R.mass*rod2R.com + rod3R.mass*rod3R.com + rod4R.mass*rod4R.com + rod5R.mass*rod5R.com + panelmidR.mass*panelmidR.com + panelouterR.mass*panelouterR.com + panelinnerR.mass*panelinnerR.com + panelupR.mass*panelupR.com + paneldownR.mass*paneldownR.com
     tot_com = (tot_bus_com + tot_left_com + tot_right_com)/tot_mass
-    tot_com[1] = 0 # Value is off by 0.0003744 due to rounding errors, force this to be zero for consistency
     
 # ignore this section this was just a visual sanity check for the COM calculations
 if False:
     print('ignore')
-    ## Plot the individual COM to see if it looks semi-legit I'M TWEAKING HOW DOES ANYONE USE PYTHON
-    # fig = plt.figure()
-    # ax = fig.add_subplot(projection = '3d')
+    # Plot the individual COM to see if it looks semi-legit I'M TWEAKING HOW DOES ANYONE USE PYTHON
+    fig = plt.figure()
+    ax = fig.add_subplot(projection = '3d')
 
-    # ax.plot(bus.com[0], bus.com[1], bus.com[2], 'o')
-    # ax.plot(antenna1.com[0], antenna1.com[1], antenna1.com[2], 'o')
-    # ax.plot(antenna2.com[0], antenna2.com[1], antenna2.com[2], 'o')
+    ax.plot(bus.com[0], bus.com[1], bus.com[2], 'bo')
+    ax.plot(antenna1.com[0], antenna1.com[1], antenna1.com[2], 'yo')
+    ax.plot(antenna2.com[0], antenna2.com[1], antenna2.com[2], 'yo')
 
-    # ax.plot(rod1L.com[0], rod1L.com[1], rod1L.com[2], 'ro')
-    # ax.plot(rod2L.com[0], rod2L.com[1], rod2L.com[2], 'ro')
-    # ax.plot(rod3L.com[0], rod3L.com[1], rod3L.com[2], 'ro')
-    # ax.plot(rod4L.com[0], rod4L.com[1], rod4L.com[2], 'ro')
-    # ax.plot(rod5L.com[0], rod5L.com[1], rod5L.com[2], 'ro')
+    ax.plot(rod1L.com[0], rod1L.com[1], rod1L.com[2], 'ro')
+    ax.plot(rod2L.com[0], rod2L.com[1], rod2L.com[2], 'ro')
+    ax.plot(rod3L.com[0], rod3L.com[1], rod3L.com[2], 'ro')
+    ax.plot(rod4L.com[0], rod4L.com[1], rod4L.com[2], 'ro')
+    ax.plot(rod5L.com[0], rod5L.com[1], rod5L.com[2], 'ro')
 
-    # ax.plot(panelmidL.com[0], panelmidL.com[1], panelmidL.com[2], 'go')
-    # ax.plot(panelouterL.com[0], panelouterL.com[1], panelouterL.com[2], 'go')
-    # ax.plot(panelinnerL.com[0], panelinnerL.com[1], panelinnerL.com[2], 'go')
-    # ax.plot(panelupL.com[0], panelupL.com[1], panelupL.com[2], 'go')
-    # ax.plot(paneldownL.com[0], paneldownL.com[1], paneldownL.com[2], 'go')
+    ax.plot(panelmidL.com[0], panelmidL.com[1], panelmidL.com[2], 'go')
+    ax.plot(panelouterL.com[0], panelouterL.com[1], panelouterL.com[2], 'go')
+    ax.plot(panelinnerL.com[0], panelinnerL.com[1], panelinnerL.com[2], 'go')
+    ax.plot(panelupL.com[0], panelupL.com[1], panelupL.com[2], 'go')
+    ax.plot(paneldownL.com[0], paneldownL.com[1], paneldownL.com[2], 'go')
 
-    # ax.plot(rod1R.com[0], rod1R.com[1], rod1R.com[2], 'ro')
-    # ax.plot(rod2R.com[0], rod2R.com[1], rod2R.com[2], 'ro')
-    # ax.plot(rod3R.com[0], rod3R.com[1], rod3R.com[2], 'ro')
-    # ax.plot(rod4R.com[0], rod4R.com[1], rod4R.com[2], 'ro')
-    # ax.plot(rod5R.com[0], rod5R.com[1], rod5R.com[2], 'ro')
+    ax.plot(rod1R.com[0], rod1R.com[1], rod1R.com[2], 'bo') # THESE ARE OFF
+    ax.plot(rod2R.com[0], rod2R.com[1], rod2R.com[2], 'bo')
+    ax.plot(rod3R.com[0], rod3R.com[1], rod3R.com[2], 'bo')
+    ax.plot(rod4R.com[0], rod4R.com[1], rod4R.com[2], 'bo')
+    ax.plot(rod5R.com[0], rod5R.com[1], rod5R.com[2], 'bo')
 
-    # ax.plot(panelmidR.com[0], panelmidR.com[1], panelmidR.com[2], 'go')
-    # ax.plot(panelouterR.com[0], panelouterR.com[1], panelouterR.com[2], 'go')
-    # ax.plot(panelinnerR.com[0], panelinnerR.com[1], panelinnerR.com[2], 'go')
-    # ax.plot(panelupR.com[0], panelupR.com[1], panelupR.com[2], 'go')
-    # ax.plot(paneldownR.com[0], paneldownR.com[1], paneldownR.com[2], 'go')
+    ax.plot(panelmidR.com[0], panelmidR.com[1], panelmidR.com[2], 'go')
+    ax.plot(panelouterR.com[0], panelouterR.com[1], panelouterR.com[2], 'go')
+    ax.plot(panelinnerR.com[0], panelinnerR.com[1], panelinnerR.com[2], 'go')
+    ax.plot(panelupR.com[0], panelupR.com[1], panelupR.com[2], 'go')
+    ax.plot(paneldownR.com[0], paneldownR.com[1], paneldownR.com[2], 'go')
 
-    # ax.set_ylim(-10, 10)
-    # ax.set_xlim(-10, 10)
-    # ax.set_xlabel('X')
-    # ax.set_ylabel('Y')
-    # ax.set_zlabel('Z')
-    # plt.show()
+    ax.set_ylim(-10, 10)
+    ax.set_xlim(-10, 10)
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    plt.show()
 
 # Calculate the MOI at the global COM for each piece and then for the whole
 if True:
@@ -330,8 +329,6 @@ if True:
     tot_left_moicom = rod4L.MOICOM + rod5L.MOICOM + panelmidL.MOICOM + panelouterL.MOICOM + panelinnerL.MOICOM + panelupL.MOICOM + paneldownL.MOICOM
     tot_right_moicom = rod4R.MOICOM + rod5R.MOICOM + panelmidR.MOICOM + panelouterR.MOICOM + panelinnerR.MOICOM + panelupR.MOICOM + paneldownR.MOICOM
     tot_moicom = tot_bus_moicom + tot_left_moicom + tot_right_moicom
-    tot_moicom[1, 2] = 0 # very close to 0, should be 0 because of symmetry
-    tot_moicom[2, 1] = 0 # very close to 0, should be 0 because of symmetry
 
 # Align the surface normal vectors for rotated pieces, and remove "blocked" faces
 if True:
@@ -426,5 +423,3 @@ if True:
     panelupR.nvecx1 = None # Blocked
 
     paneldownR.nvecx2 = None # Blocked
-
-# Start here
