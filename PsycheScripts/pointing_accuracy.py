@@ -8,9 +8,13 @@ from mekf_with_controller import (
     gravity_gradient_torque, solar_radiation_torque,
 )
 
+##### Notes ######
+# Let's use "PSYCHE" for the asteroid and "psyche" for the spacecraft bc I'm getting confused
+# Use J2000 frame for everything
+
 # ── Tracking gains (override regulator gains from attitude_controller.py) ──────
 # The regulator used wn=0.05 rad/s, which is too slow for tracking a target
-# that moves at Psyche's spin rate (~4.2e-4 rad/s). We need wn >> omega_psyche.
+# that moves at Psyche's spin rate (~4.2e-4 rad/s). We need wn >> omega_PSYCHE.
 # Constraint: Kp_i * phi_e <= tau_max even for moderate errors (~10° = 0.17 rad)
 #   => wn <= sqrt(tau_max / (J_max * 0.17)) = sqrt(0.05 / (2923 * 0.17)) ≈ 0.010
 # Use wn=0.008 rad/s with zeta=1.0 (critically damped) to avoid oscillation.
@@ -49,22 +53,22 @@ Psyche parameters:
 
 # ── Psyche rotation model ─────────────────────────────────────────────────────
 ####### I'M NOT SUPER SURE ABOUT THIS #######
-T_psyche_spin = 4.196 * 3600.0          # [s]  spin period
-omega_psyche  = 2 * np.pi / T_psyche_spin  # [rad/s]  spin rate
+T_PSYCHE_spin = 4.196 * 3600.0          # [s]  spin period
+omega_PSYCHE  = 2 * np.pi / T_PSYCHE_spin  # [rad/s]  spin rate
 
 # Pole orientation in J2000 (RA=35°, Dec=-7°) → inertial unit vector
 RA_pole  = np.radians(35.0)
 Dec_pole = np.radians(-7.0)
-PSYCHE_POLE = np.array([
+PSYCHE_pole = np.array([
     np.cos(Dec_pole) * np.cos(RA_pole),
     np.cos(Dec_pole) * np.sin(RA_pole),
     np.sin(Dec_pole)
 ])
-PSYCHE_POLE = PSYCHE_POLE / np.linalg.norm(PSYCHE_POLE)
+PSYCHE_pole = PSYCHE_pole / np.linalg.norm(PSYCHE_pole)
 
 # Sun direction: fixed in inertial frame (Psyche orbital motion negligible
 # over spacecraft orbital timescales — period ~5 yr vs ~12 hr)
-SUN_VEC = adcs.unit_vec(np.array([1.0, 0.0, 0.0]))
+sun_vec = adcs.unit_vec(np.array([1.0, 0.0, 0.0]))
 
 # Orbital rate
 omega_orbit = 2 * np.pi / T_orbit
@@ -75,10 +79,10 @@ omega_orbit = 2 * np.pi / T_orbit
 def psyche_rotation_matrix(t):
     """
     Rotation matrix from Psyche body frame to inertial frame at time t.
-    Rodrigues' rotation formula: rotate about PSYCHE_POLE by omega_psyche * t.
+    Rodrigues' rotation formula: rotate about PSYCHE_pole by omega_PSYCHE * t.
     """
-    angle = omega_psyche * t
-    k     = PSYCHE_POLE
+    angle = omega_PSYCHE * t
+    k     = PSYCHE_pole
     K     = adcs.hat(k)
     return np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * (K @ K)
 
@@ -96,12 +100,12 @@ def spot_inertial(t, spot_body):
 def spacecraft_position_inertial(t):
     """
     Spacecraft position unit vector in inertial frame.
-    Polar orbit: orbit plane contains +X (Sun direction).
-    Orbit normal = +Y, spacecraft rotates in X-Z plane.
+    Polar orbit is defined in Psyche body frame: orbit plane is the
+    body X-Z plane and orbit normal is body +Y. THIS HAS TO BE RECASTED TO J2000
     """
     theta = omega_orbit * t
-    r_hat = np.array([np.cos(theta), 0.0, np.sin(theta)])
-    return r_hat   # unit vector FROM Psyche center TO spacecraft
+    r_body = np.array([np.cos(theta), 0.0, np.sin(theta)])
+    return psyche_rotation_matrix(t) @ r_body   # unit vector FROM Psyche center TO spacecraft in J2000
 
 
 def is_visible(t, spot_body):
@@ -135,7 +139,7 @@ def compute_q_target(t, spot_body):
     x_b     = -neg_x_b                     # body +X in inertial
 
     # Secondary: project Sun onto plane perpendicular to x_b to get z_b
-    sun_proj = SUN_VEC - np.dot(SUN_VEC, neg_x_b) * neg_x_b
+    sun_proj = sun_vec - np.dot(sun_vec, neg_x_b) * neg_x_b
     sun_proj_norm = np.linalg.norm(sun_proj)
     if sun_proj_norm < 1e-10:
         # Degenerate: Sun is along the instrument axis. Fall back to orbit normal.
@@ -186,7 +190,7 @@ def solar_panel_efficiency(q):
     1.0 = perfect, 0.0 = panels edge-on to Sun.
     """
     z_inertial = adcs.Q(q) @ np.array([0., 0., 1.])
-    return max(0.0, np.dot(z_inertial, SUN_VEC))
+    return max(0.0, np.dot(z_inertial, sun_vec))
 
 
 # ── MEKF step ──────────────────────────────────────
@@ -197,9 +201,11 @@ def mekf_step(x_est, P_est, gyro_m, q_sru, dt, sigma_gyro, sigma_bias, sigma_sru
         [np.zeros((3, 3)),          sigma_bias**2 * np.eye(3)]
     ])
     W_kf = sigma_sru**2 * np.eye(3)
+
     q_p, beta_p = x_est[:4], x_est[4:7]
     q_pred = adcs.unit_vec(adcs.L(q_p) @ adcs.qexp(0.5*dt*(gyro_m - beta_p)))
     x_pred = np.concatenate([q_pred, beta_p])
+    
     qk1       = x_pred[:4]
     dphidphi  = adcs.G(qk1).T @ adcs.R(adcs.qexp(0.5*dt*(gyro_m-beta_p))) @ adcs.G(q_p)
     dphidbeta = -0.5*dt * adcs.G(qk1).T @ adcs.G(q_p)
@@ -214,6 +220,7 @@ def mekf_step(x_est, P_est, gyro_m, q_sru, dt, sigma_gyro, sigma_bias, sigma_sru
     phi_upd = -delta[:3]
     q_upd   = adcs.L(x_pred[:4]) @ np.concatenate([
                   [np.sqrt(max(1 - phi_upd@phi_upd, 0.0))], phi_upd])
+    
     x_new = np.concatenate([adcs.unit_vec(q_upd), x_pred[4:7] - delta[3:6]])
     P_new = (np.eye(6) - K@C) @ P_pred @ (np.eye(6) - K@C).T + K@W_kf@K.T
     return x_new, P_new
@@ -257,7 +264,7 @@ def run_surface_pointing(n_orbits=3, dt=2.0):
         # Build a safe default: -X nadir, +Z toward Sun
         neg_x_b = nadir
         x_b     = -neg_x_b
-        sun_proj = SUN_VEC - np.dot(SUN_VEC, neg_x_b)*neg_x_b
+        sun_proj = sun_vec - np.dot(sun_vec, neg_x_b)*neg_x_b
         if np.linalg.norm(sun_proj) < 1e-10:
             sun_proj = np.array([0.,1.,0.])
         z_b = adcs.unit_vec(sun_proj)
@@ -339,7 +346,7 @@ def run_surface_pointing(n_orbits=3, dt=2.0):
         r_hat = spacecraft_position_inertial(t)
         nadir = -r_hat
         tau_gg  = gravity_gradient_torque(q_true, nadir)
-        tau_srp = solar_radiation_torque(q_true, SUN_VEC)
+        tau_srp = solar_radiation_torque(q_true, sun_vec)
         tau_dist = tau_gg + tau_srp
 
         # ── Log ───────────────────────────────────────────────────────────────
@@ -475,14 +482,14 @@ if __name__ == '__main__':
     print("SURFACE SPOT POINTING CONTROLLER")
     print(f"  Orbital period  = {T_orbit/60:.1f} min")
     print(f"  Psyche spin period = {T_psyche_spin/3600:.3f} hr")
-    print(f"  Psyche pole (inertial) = {np.round(PSYCHE_POLE, 4)}")
+    print(f"  Psyche pole (inertial) = {np.round(PSYCHE_pole, 4)}")
     print("=" * 60)
 
     print(f"  wn_track = {wn_track} rad/s,  zeta_track = {zeta_track}  (critically damped)")
     print(f"  Kp diag  = {np.round(np.diag(Kp_mat), 4)}")
     print(f"  Kd diag  = {np.round(np.diag(Kd_mat), 4)}")
-    print(f"  Psyche spin rate = {omega_psyche*1e4:.2f}e-4 rad/s  "
-          f"(wn/omega_psyche = {wn_track/omega_psyche:.1f})")
+    print(f"  Psyche spin rate = {omega_PSYCHE*1e4:.2f}e-4 rad/s  "
+          f"(wn/omega_PSYCHE = {wn_track/omega_PSYCHE:.1f})")
 
     results = run_surface_pointing(n_orbits=3, dt=2.0)
     plot_results(results)
