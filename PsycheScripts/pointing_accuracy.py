@@ -163,15 +163,14 @@ def compute_q_target(t, spot_body):
 
 def compute_omega_target(t, spot_body, dt=1.0):
     """
-    Angular rate of the target frame, estimated by finite difference.
-    omega_target = 2 * G(q_target).T @ q_dot_target
+    Angular rate of the target frame, estimated by small difference over time.
+    omega_target = 2 * qlog(q_rel) / dt, where q_rel = q_t_dt * q_t^{-1}
     """
     q_t    = compute_q_target(t, spot_body)
     q_t_dt = compute_q_target(t + dt, spot_body)
-    if np.dot(q_t, q_t_dt) < 0:
-        q_t_dt = -q_t_dt
-    q_dot  = (q_t_dt - q_t) / dt
-    return 2.0 * adcs.G(q_t).T @ q_dot
+    q_rel  = adcs.qmult(adcs.qinv(q_t), q_t_dt)
+    phi    = adcs.qlog(q_rel)
+    return 2.0 * phi / dt
 
 
 # ── Pointing error metrics ────────────────────────────────────────────────────
@@ -481,7 +480,7 @@ if __name__ == '__main__':
     print("=" * 60)
     print("SURFACE SPOT POINTING CONTROLLER")
     print(f"  Orbital period  = {T_orbit/60:.1f} min")
-    print(f"  Psyche spin period = {T_psyche_spin/3600:.3f} hr")
+    print(f"  Psyche spin period = {T_PSYCHE_spin/3600:.3f} hr")
     print(f"  Psyche pole (inertial) = {np.round(PSYCHE_pole, 4)}")
     print("=" * 60)
 
