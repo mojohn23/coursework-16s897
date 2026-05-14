@@ -52,7 +52,6 @@ Psyche parameters:
 """
 
 # ── Psyche rotation model ─────────────────────────────────────────────────────
-####### I'M NOT SUPER SURE ABOUT THIS #######
 T_PSYCHE_spin = 4.196 * 3600.0          # [s]  spin period
 omega_PSYCHE  = 2 * np.pi / T_PSYCHE_spin  # [rad/s]  spin rate
 
@@ -238,11 +237,34 @@ def run_surface_pointing(n_orbits=3, dt=2.0):
     N     = len(t_arr)
 
     # ── Random surface spot ────────────────────────────────────────────────────
-    # Unit vector in Psyche body frame — fixed on the surface
-    spot_body = adcs.unit_vec(np.random.randn(3))
-    print(f"  Surface spot (Psyche body frame): {np.round(spot_body, 4)}")
-    lat = np.degrees(np.arcsin(spot_body[2]))
-    lon = np.degrees(np.arctan2(spot_body[1], spot_body[0]))
+
+    ## for random spot ##
+    # # Unit vector in Psyche body frame — fixed on the surface
+    # spot_body = adcs.unit_vec(np.random.randn(3))
+    # print(f"  Surface spot (Psyche body frame): {np.round(spot_body, 4)}")
+    # lat = np.degrees(np.arcsin(spot_body[2]))
+    # lon = np.degrees(np.arctan2(spot_body[1], spot_body[0]))
+
+    ## for chosen spot ##
+    # Input latitude and longitude in degrees
+    lat_deg = 0
+    lon_deg = 345
+
+    # Convert to radians
+    lat = np.radians(lat_deg)
+    lon = np.radians(lon_deg)
+
+    # Convert lat/lon to Cartesian unit vector
+    spot_body = np.array([
+        np.cos(lat) * np.cos(lon),
+        np.cos(lat) * np.sin(lon),
+        np.sin(lat)
+    ])
+
+    # Optional normalization (should already be unit length)
+    spot_body = adcs.unit_vec(spot_body)
+
+    print(f"Surface spot (Psyche body frame): {np.round(spot_body, 4)}")
     print(f"  Lat = {lat:.1f}°,  Lon = {lon:.1f}°")
 
     # ── Noise parameters ───────────────────────────────────────────────────────
@@ -281,6 +303,8 @@ def run_surface_pointing(n_orbits=3, dt=2.0):
     visible_h    = np.zeros(N)    # visibility flag (1=visible, 0=not)
     tau_h        = np.zeros((N, 3))
     h_w_h        = np.zeros((N, 3))
+    omega_h      = np.zeros((N, 3))
+    omega_tgt_h  = np.zeros((N, 3))
 
     # ── Pre-compute next visibility transition times ───────────────────────────
     # For each timestep, store the time of the next visibility window start.
@@ -354,6 +378,8 @@ def run_surface_pointing(n_orbits=3, dt=2.0):
         visible_h[i]   = 1.0 if visible else 0.0
         tau_h[i]       = tau_cmd
         h_w_h[i]       = h_w
+        omega_h[i]     = omega
+        omega_tgt_h[i] = omega_target
 
         # ── Integrate ─────────────────────────────────────────────────────────
         def f(t_, s_):
@@ -382,6 +408,8 @@ def run_surface_pointing(n_orbits=3, dt=2.0):
         'visible':    visible_h,
         'tau':        tau_h,
         'h_w':        h_w_h,
+        'omega':      omega_h,
+        'omega_tgt':  omega_tgt_h,
         'spot_body':  spot_body,
     }
 
@@ -411,7 +439,7 @@ def plot_results(results):
             ax.axvline(k * T_orb_min, color='grey', linestyle='--',
                        lw=0.8, alpha=0.5)
 
-    fig, axes = plt.subplots(4, 1, figsize=(13, 11), sharex=True)
+    fig, axes = plt.subplots(3, 1, figsize=(13, 11), sharex=True)
     fig.suptitle('Surface Spot Pointing Controller\n'
                  '(green = spot visible, grey lines = orbit periods)',
                  fontsize=12, fontweight='bold')
@@ -437,31 +465,45 @@ def plot_results(results):
     axes[1].legend(fontsize=8)
     axes[1].grid(True, alpha=0.3)
 
-    # ── Panel 3: Commanded torque ─────────────────────────────────────────────
-    for j, (lbl, col) in enumerate(zip(['τ₁','τ₂','τ₃'],
-                                        ['steelblue','darkorange','green'])):
-        axes[2].plot(t_min, results['tau'][:, j], lw=0.7,
-                     alpha=0.8, label=lbl, color=col)
-    axes[2].axhline( tau_max, color='r', linestyle=':', lw=1.0, label='±τ_max')
-    axes[2].axhline(-tau_max, color='r', linestyle=':', lw=1.0)
-    # Only add orbit period lines here, skip per-window shading to reduce clutter
-    for k in range(1, int(t_min[-1] / T_orb_min) + 1):
-        axes[2].axvline(k * T_orb_min, color='grey', linestyle='--',
-                        lw=0.8, alpha=0.5)
-    axes[2].set_ylabel('τ_cmd per axis [N·m]')
-    axes[2].legend(fontsize=8)
+    # ── Panel 3: Body rates ───────────────────────────────────────────────────
+    omega_deg = np.degrees(results['omega'])       # convert rad/s → deg/s
+    omega_tgt_deg = np.degrees(results['omega_tgt'])
+    for j, (lbl, col) in enumerate(zip([r'$\omega_1$', r'$\omega_2$', r'$\omega_3$'],
+                                        ['steelblue', 'darkorange', 'green'])):
+        axes[2].plot(t_min, omega_deg[:, j], lw=0.8, color=col,
+                     alpha=0.9, label=f'{lbl} true')
+        axes[2].plot(t_min, omega_tgt_deg[:, j], lw=0.8, color=col,
+                     alpha=0.4, linestyle='--', label=f'{lbl} target')
+    shade_visible(axes[2])
+    axes[2].set_ylabel('Body Rate [deg/s]')
+    axes[2].legend(fontsize=7, ncol=3)
     axes[2].grid(True, alpha=0.3)
 
-    # ── Panel 4: Wheel momentum ───────────────────────────────────────────────
-    for j, lbl in enumerate(['h_w1', 'h_w2', 'h_w3']):
-        axes[3].plot(t_min, results['h_w'][:, j], lw=0.8, label=lbl)
-    axes[3].axhline( h_max, color='k', linestyle=':', lw=1.0)
-    axes[3].axhline(-h_max, color='k', linestyle=':', lw=1.0, label='±h_max')
-    shade_visible(axes[3])
-    axes[3].set_ylabel('Wheel Momentum [N·m·s]')
-    axes[3].set_xlabel('Time [min]')
-    axes[3].legend(fontsize=8, ncol=4)
-    axes[3].grid(True, alpha=0.3)
+    # # ── Panel 4: Commanded torque ─────────────────────────────────────────────
+    # for j, (lbl, col) in enumerate(zip(['τ₁','τ₂','τ₃'],
+    #                                     ['steelblue','darkorange','green'])):
+    #     axes[3].plot(t_min, results['tau'][:, j], lw=0.7,
+    #                  alpha=0.8, label=lbl, color=col)
+    # axes[3].axhline( tau_max, color='r', linestyle=':', lw=1.0, label='±τ_max')
+    # axes[3].axhline(-tau_max, color='r', linestyle=':', lw=1.0)
+    # # Only add orbit period lines here, skip per-window shading to reduce clutter
+    # for k in range(1, int(t_min[-1] / T_orb_min) + 1):
+    #     axes[3].axvline(k * T_orb_min, color='grey', linestyle='--',
+    #                     lw=0.8, alpha=0.5)
+    # axes[3].set_ylabel('τ_cmd per axis [N·m]')
+    # axes[3].legend(fontsize=8)
+    # axes[3].grid(True, alpha=0.3)
+
+    # # ── Panel 5: Wheel momentum ───────────────────────────────────────────────
+    # for j, lbl in enumerate(['h_w1', 'h_w2', 'h_w3']):
+    #     axes[4].plot(t_min, results['h_w'][:, j], lw=0.8, label=lbl)
+    # axes[4].axhline( h_max, color='k', linestyle=':', lw=1.0)
+    # axes[4].axhline(-h_max, color='k', linestyle=':', lw=1.0, label='±h_max')
+    # shade_visible(axes[4])
+    # axes[4].set_ylabel('Wheel Momentum [N·m·s]')
+    # axes[4].set_xlabel('Time [min]')
+    # axes[4].legend(fontsize=8, ncol=4)
+    # axes[4].grid(True, alpha=0.3)
 
     plt.tight_layout()
     plt.savefig('surface_pointing_results.png', dpi=150)
